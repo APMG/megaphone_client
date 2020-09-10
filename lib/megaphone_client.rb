@@ -57,7 +57,8 @@ module MegaphoneClient
           payload: options[:body].to_json
         )
       rescue RestClient::ExceptionWithResponse => err
-        raise ConnectionError.new("Megaphone ConnectionError: #{err.response.description}, Request: #{err.response.request.method} #{err.response.request.url}")
+        err_msg = assemble_error_message(err)
+        raise ConnectionError.new(err_msg)
       end
 
       JSON.parse(response.body, object_class: OpenStruct)
@@ -102,6 +103,25 @@ module MegaphoneClient
 
     def podcasts
       self::PodcastCollection.new
+    end
+
+    private
+
+    def assemble_error_message(exception)
+      response_error = ''
+      begin
+        case exception.response.code
+        when 400, 403
+          response_error = JSON.parse(exception.http_body)['error']
+        when 401
+          response_error = exception.http_body
+        end
+      rescue => e
+      end
+      error_message = "Megaphone ConnectionError: #{exception.response.description}, Request: #{exception.response.request.method} #{exception.response.request.url}"
+      error_message += ", Error: #{response_error}" if response_error.present?
+
+      error_message
     end
   end
 end
